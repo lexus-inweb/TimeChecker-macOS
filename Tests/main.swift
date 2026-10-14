@@ -41,6 +41,15 @@ check(Classifier.projectId(for: sess(0, 60, kind: .idle), projects: projects) ==
 check(Classifier.projectId(for: sess(0, 60, kind: .idle, pid: ti.id), projects: projects) == ti.id, "cls: простой можно отнести вручную")
 check(Classifier.projectId(for: sess(0, 60, pid: UUID()), projects: projects) == nil, "cls: удалённый проект")
 
+check(Report.stripBrowserTail("Хроника / inweb - Google Chrome – Work (example.com)") == "Хроника / inweb", "tail: хвост Chrome с профилем")
+check(Report.stripBrowserTail("Notes - Archive") == "Notes - Archive", "tail: Arc только целым словом")
+check(Report.stripBrowserTail("Inbox — Safari") == "Inbox", "tail: Safari")
+do {
+    let work = Project(name: "Work", domains: ["example.com"], keywords: ["work"])
+    let chromeTitle = sess(0, 60, title: "Хроника / inweb - Google Chrome – Work (example.com)", url: "https://inweb.planfix.com/x")
+    check(Classifier.projectId(for: chromeTitle, projects: [work]) == nil, "cls: профиль Chrome в заголовке не ловится правилами")
+}
+
 // MARK: Report
 check(Report.roundMinutes(30, step: 5) == 0, "round: < минуты = 0")
 check(Report.roundMinutes(61, step: 5) == 5, "round: минимум один шаг")

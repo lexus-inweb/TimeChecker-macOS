@@ -45,6 +45,9 @@ echo "→ подпись (ad-hoc)"
 codesign --force --sign - --requirements Resources/requirement.txt "$APP"
 
 if [[ "$1" == "install" ]]; then
+  # Мягкий выход: приложение успевает сохранить текущий день
+  osascript -e 'quit app id "com.lexus.timechecker"' 2>/dev/null || true
+  sleep 1
   pkill -x TimeChecker 2>/dev/null || true
   sleep 1
   rm -rf "/Applications/Time Checker.app"

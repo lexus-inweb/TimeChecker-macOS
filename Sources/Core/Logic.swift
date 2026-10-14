@@ -11,7 +11,8 @@ enum Classifier {
         }
         guard s.kind == .active else { return nil }
 
-        let title = s.title.lowercased()
+        // Хвост браузера («- Google Chrome – Alexey (inweb.ua)») есть в каждом окне — по нему не матчим.
+        let title = Report.stripBrowserTail(s.title).lowercased()
         let url = (s.url ?? "").lowercased()
 
         if let domain = s.domain {
@@ -81,6 +82,25 @@ enum Report {
         "google chrome", "safari", "brave", "microsoft edge", "arc", "firefox", "mozilla firefox",
         "vivaldi", "opera", "yandex", "chromium",
     ]
+
+    /// "Задача — Планфикс - Google Chrome – Alexey (inweb.ua)" → "Задача — Планфикс"
+    static func stripBrowserTail(_ title: String) -> String {
+        var cut = title.endIndex
+        for sep in [" — ", " – ", " - ", " | ", " · "] {
+            for name in browserNames {
+                var from = title.startIndex
+                while let r = title.range(of: sep + name, options: .caseInsensitive, range: from..<title.endIndex) {
+                    // Имя браузера должно быть целым словом: " - Arc" да, " - Archive" нет.
+                    if r.upperBound == title.endIndex || title[r.upperBound] == " " {
+                        if r.lowerBound < cut { cut = r.lowerBound }
+                        break
+                    }
+                    from = r.upperBound
+                }
+            }
+        }
+        return String(title[..<cut])
+    }
 
     /// Чистит заголовок для комментария: убирает имя браузера/приложения, счётчики "(3)", почты.
     static func cleanTitle(_ title: String, app: String, domain: String? = nil) -> String {
