@@ -131,6 +131,23 @@ func runRegressionTests() {
               "домен в заголовке: выделение доменов из текста")
     }
 
+    // Быстрая обрезка хвоста браузера и кэш разбора заголовков (нагрузка CPU при открытом окне)
+    do {
+        check(Report.stripBrowserTail("Inbox - Arc") == "Inbox" && Report.stripBrowserTail("Notes - Archive") == "Notes - Archive",
+              "хвост: имя браузера в конце строки и не-браузер с тем же началом")
+        check(Report.stripBrowserTail("A - B - Google Chrome – Work") == "A - B" && Report.stripBrowserTail("Docs | Safari") == "Docs",
+              "хвост: дефисы внутри заголовка остаются, отрезается только браузер")
+        check(Report.stripBrowserTail("Очень длинный заголовок без браузера — совсем") == "Очень длинный заголовок без браузера — совсем",
+              "хвост: заголовок без браузера не меняется")
+        let a = TitleIndex.parse("Аудит ti.ua — ТЕХНОЇЖАК - Google Chrome – Work (example.com)")
+        let b = TitleIndex.parse("Аудит ti.ua — ТЕХНОЇЖАК - Google Chrome – Work (example.com)")
+        check(a.text == "аудит ti.ua — техноїжак", "кэш: заголовок разобран без хвоста браузера, в нижнем регистре")
+        check(a.domains == ["ti.ua"] && a.domains == b.domains && a.lookalike == b.lookalike && !a.text.contains("example.com"),
+              "кэш: повторный разбор совпадает, домен профиля не попал")
+        check(TitleIndex.keyword("  CEO ").plain == "ceo" && TitleIndex.keyword("СЕО").lookalike == TitleIndex.keyword("CEO").lookalike,
+              "кэш: фразы правил нормализуются так же, как раньше")
+    }
+
     // 5. Адрес вкладки: обновление, повтор при ошибке, отброс ответа про другую вкладку
     do {
         var p = URLCachePolicy()

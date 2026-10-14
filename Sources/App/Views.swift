@@ -194,14 +194,21 @@ struct MainView: View {
 
     var body: some View {
         TabView(selection: $tab) {
-            ReportView(day: $day, tab: $tab).tabItem { Label("Отчёт", systemImage: "doc.text") }.tag(MainTab.report)
-            OtherView(day: $day).tabItem { Label("Другое", systemImage: "tray") }.tag(MainTab.other)
-            DashboardView(day: $day).tabItem { Label("Дашборд", systemImage: "chart.bar") }.tag(MainTab.dashboard)
-            ProjectsView().tabItem { Label("Проекты", systemImage: "folder") }.tag(MainTab.projects)
-            SettingsView().tabItem { Label("Настройки", systemImage: "gearshape") }.tag(MainTab.settings)
-            HelpView().tabItem { Label("Справка", systemImage: "questionmark.circle") }.tag(MainTab.help)
+            page(.report) { ReportView(day: $day, tab: $tab) }.tabItem { Label("Отчёт", systemImage: "doc.text") }.tag(MainTab.report)
+            page(.other) { OtherView(day: $day) }.tabItem { Label("Другое", systemImage: "tray") }.tag(MainTab.other)
+            page(.dashboard) { DashboardView(day: $day) }.tabItem { Label("Дашборд", systemImage: "chart.bar") }.tag(MainTab.dashboard)
+            page(.projects) { ProjectsView() }.tabItem { Label("Проекты", systemImage: "folder") }.tag(MainTab.projects)
+            page(.settings) { SettingsView() }.tabItem { Label("Настройки", systemImage: "gearshape") }.tag(MainTab.settings)
+            page(.help) { HelpView() }.tabItem { Label("Справка", systemImage: "questionmark.circle") }.tag(MainTab.help)
         }
         .padding(.top, 4)
+    }
+
+    /// TabView на Mac пересчитывает все вкладки при каждом обновлении модели — и «Другое», и дашборд
+    /// за месяц, даже когда открыты «Настройки». Считаем только открытую.
+    @ViewBuilder
+    private func page<Content: View>(_ t: MainTab, @ViewBuilder _ content: () -> Content) -> some View {
+        if tab == t { content() } else { Color.clear }
     }
 }
 

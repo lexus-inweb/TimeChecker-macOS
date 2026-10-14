@@ -12,7 +12,7 @@ enum Classifier {
         guard s.kind == .active else { return nil }
 
         // Хвост браузера («- Google Chrome – Alexey (inweb.ua)») есть в каждом окне — по нему не матчим.
-        let title = Report.stripBrowserTail(s.title).lowercased()
+        let title = TitleIndex.parse(s.title)
         let url = (s.url ?? "").lowercased()
 
         if let domain = s.domain {
@@ -20,18 +20,16 @@ enum Classifier {
                 return p.id
             }
         }
-        let titleDomains = Domain.candidates(in: title)
         for p in live {
-            let hit = p.domains.contains { rule in titleDomains.contains { Domain.matches($0, rule: rule) } }
+            let hit = p.domains.contains { rule in title.domains.contains { Domain.matches($0, rule: rule) } }
             if hit { return p.id }
         }
         // Фразы сверяем без разницы между одинаковыми на вид кириллицей и латиницей:
         // распознанное название чата Telegram приходит как «СEО» вместо «CEO».
-        let titleKey = Lookalikes.key(title)
         for p in live {
             let hit = p.keywords.contains { raw in
-                let k = raw.trimmingCharacters(in: .whitespaces).lowercased()
-                return !k.isEmpty && (titleKey.contains(Lookalikes.key(k)) || url.contains(k))
+                let k = TitleIndex.keyword(raw)
+                return !k.plain.isEmpty && (title.lookalike.contains(k.lookalike) || url.contains(k.plain))
             }
             if hit { return p.id }
         }
@@ -44,6 +42,45 @@ enum Classifier {
             if hit { return p.id }
         }
         return nil
+    }
+}
+
+/// Разбор заголовка для правил дорогой (регулярка доменов, нормализация букв), а заголовки повторяются
+/// сотни раз: интерфейс пересчитывает отчёт на каждое обновление. Поэтому разбор кэшируется по строке.
+enum TitleIndex {
+    struct Parsed {
+        /// Заголовок без хвоста браузера, в нижнем регистре.
+        let text: String
+        /// Похожие на домены слова из него.
+        let domains: [String]
+        /// text, где одинаковые на вид кириллица и латиница сведены к одному виду.
+        let lookalike: String
+    }
+
+    private static var titles: [String: Parsed] = [:]
+    private static var keywords: [String: (plain: String, lookalike: String)] = [:]
+    private static let lock = NSLock()
+    private static let limit = 20_000
+
+    static func parse(_ title: String) -> Parsed {
+        lock.lock(); defer { lock.unlock() }
+        if let p = titles[title] { return p }
+        if titles.count > limit { titles.removeAll(keepingCapacity: true) }
+        let text = Report.stripBrowserTail(title).lowercased()
+        let p = Parsed(text: text, domains: Domain.candidates(in: text), lookalike: Lookalikes.key(text))
+        titles[title] = p
+        return p
+    }
+
+    /// Фраза из правила проекта в том же виде, что и разобранный заголовок.
+    static func keyword(_ raw: String) -> (plain: String, lookalike: String) {
+        lock.lock(); defer { lock.unlock() }
+        if let k = keywords[raw] { return k }
+        if keywords.count > limit { keywords.removeAll(keepingCapacity: true) }
+        let plain = raw.trimmingCharacters(in: .whitespaces).lowercased()
+        let k = (plain, Lookalikes.key(plain))
+        keywords[raw] = k
+        return k
     }
 }
 
@@ -101,18 +138,19 @@ enum Report {
 
     /// "Задача — Планфикс - Google Chrome – Alexey (inweb.ua)" → "Задача — Планфикс"
     static func stripBrowserTail(_ title: String) -> String {
+        // Ищем только разделители (их в заголовке единицы) и смотрим, не имя ли браузера идёт следом.
+        // Перебор «разделитель × браузер» с поиском без учёта регистра был главным пожирателем CPU.
         var cut = title.endIndex
         for sep in [" — ", " – ", " - ", " | ", " · "] {
-            for name in browserNames {
-                var from = title.startIndex
-                while let r = title.range(of: sep + name, options: .caseInsensitive, range: from..<title.endIndex) {
-                    // Имя браузера должно быть целым словом: " - Arc" да, " - Archive" нет.
-                    if r.upperBound == title.endIndex || title[r.upperBound] == " " {
-                        if r.lowerBound < cut { cut = r.lowerBound }
-                        break
-                    }
-                    from = r.upperBound
+            var from = title.startIndex
+            while from < cut, let r = title.range(of: sep, range: from..<cut) {
+                let rest = title[r.upperBound...].prefix(24).lowercased()
+                // Имя браузера должно быть целым словом: " - Arc" да, " - Archive" нет.
+                let isBrowser = browserNames.contains { name in
+                    rest.hasPrefix(name) && (rest.count == name.count || rest.dropFirst(name.count).first == " ")
                 }
+                if isBrowser { cut = r.lowerBound; break }
+                from = r.upperBound
             }
         }
         return String(title[..<cut])
