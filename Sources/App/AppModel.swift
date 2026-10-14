@@ -21,6 +21,8 @@ final class AppModel: ObservableObject {
     @Published var paused = false
     @Published private(set) var axTrusted = Sensors.accessibilityTrusted
     @Published private(set) var current: Session?
+    /// Распознавание чата в Telegram: разрешение и последний чат — для «Настроек».
+    let telegramOCR = TelegramOCRStatus()
 
     init() {
         let s = store.loadSettings()
@@ -51,6 +53,7 @@ final class AppModel: ObservableObject {
             let trusted = Sensors.accessibilityTrusted
             if trusted != axTrusted { axTrusted = trusted }
         }
+        sensors.telegramOCR = telegramOCR.update(enabled: settings.telegramOCR, tick: tickCount, chat: sensors.telegram.chat)
         let now = Date()
         if paused {
             // На паузе время не пишется, но смену дня отработать надо — иначе «сегодня» останется вчерашним.

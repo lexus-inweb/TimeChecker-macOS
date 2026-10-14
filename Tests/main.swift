@@ -1,3 +1,4 @@
+import CoreGraphics
 import Foundation
 
 // Простой раннер без XCTest (работает с Command Line Tools, без Xcode).
@@ -48,6 +49,67 @@ do {
     let work = Project(name: "Work", domains: ["example.com"], keywords: ["work"])
     let chromeTitle = sess(0, 60, title: "Хроника / inweb - Google Chrome – Work (example.com)", url: "https://inweb.planfix.com/x")
     check(Classifier.projectId(for: chromeTitle, projects: [work]) == nil, "cls: профиль Chrome в заголовке не ловится правилами")
+}
+
+// MARK: Telegram
+check(Telegram.isTelegram("ru.keepcoder.Telegram") && Telegram.isTelegram("org.telegram.desktop") && !Telegram.isTelegram("com.tdesktop.Telegram.x"), "tg: bundle id")
+check(Telegram.windowTitle(chat: "Inweb / SEO") == "Telegram — Inweb / SEO", "tg: заголовок с чатом")
+check(Telegram.windowTitle(chat: nil) == "", "tg: чат не найден → пусто")
+check(Telegram.windowTitle(chat: "  \n ") == "", "tg: пустое название → пусто")
+check(Telegram.windowTitle(chat: "Telegram @ Олексій Мамонтов CEO [Inweb.ua] — SEO, PPC / Lexus") == "", "tg: заголовок окна с аккаунтом — не чат")
+check(Telegram.windowTitle(chat: "Telegram (12)") == "", "tg: заголовок окна со счётчиком — не чат")
+check(Telegram.normalizeChat("  Продажі\u{200B}   Inweb\nonline") == "Продажі Inweb", "tg: первая строка, невидимые символы, пробелы")
+check(Telegram.normalizeChat("(3) Техноїжак") == "Техноїжак" && Telegram.normalizeChat("Техноїжак (3)") == "Техноїжак", "tg: счётчик непрочитанных")
+check(Telegram.normalizeChat(String(repeating: "я", count: 100))?.count == 78, "tg: длинное название обрезается")
+do {
+    let acc = Project(name: "Аккаунт", keywords: ["CEO", "SEO", "Inweb.ua"])
+    let tiTg = Project(name: "Техноїжак", keywords: ["техноїжак"])
+    func tgSess(_ chat: String?) -> Session {
+        sess(0, 60, app: "Telegram", bundle: "ru.keepcoder.Telegram", title: Telegram.windowTitle(chat: chat))
+    }
+    check(Classifier.projectId(for: tgSess("Техноїжак / Inweb"), projects: [tiTg]) == tiTg.id, "tg: фраза из названия чата ловит проект")
+    check(Classifier.projectId(for: tgSess(nil), projects: [acc]) == nil, "tg: имя аккаунта больше не ловит весь Telegram")
+    check(Report.cleanTitle(Telegram.windowTitle(chat: "Техноїжак / Inweb"), app: "Telegram") == "Техноїжак / Inweb", "tg: в комментарий идёт только чат")
+    // OCR путает одинаковые на вид буквы: «СEО» (кириллические С и О), «Моуо» вместо «Moyo»
+    check(Classifier.projectId(for: tgSess("Олексій СEО / Inweb"), projects: [acc]) == acc.id, "tg: фраза CEO ловит OCR-шное СEО")
+    let moyo = Project(name: "Moyo", keywords: ["Moyo"])
+    check(Classifier.projectId(for: tgSess("ТОВ Моуо"), projects: [moyo]) == moyo.id, "tg: латинская фраза ловит кириллические двойники")
+    check(Classifier.projectId(for: tgSess("Тексти Moyo"), projects: [tiTg]) == nil, "tg: двойники не ломают обычные фразы")
+}
+check(Lookalikes.key("СЕО Техноїжак") == Lookalikes.key("ceo техноїжак") && Lookalikes.key("Inweb") == "inweb", "lookalikes: регистр и двойники")
+
+// Полоса шапки: окно (0,33 1470x923), поле ввода (464,911 906x26) — замер на реальном Telegram
+do {
+    let win = CGRect(x: 0, y: 33, width: 1470, height: 923)
+    let strip = Telegram.HeaderStrip(window: win, input: CGRect(x: 464, y: 911, width: 906, height: 26))
+    check(strip?.rect(in: win) == CGRect(x: 404, y: 12, width: 1026, height: 36), "tg strip: от поля ввода к шапке")
+    let moved = CGRect(x: 100, y: 50, width: 1200, height: 800)
+    check(strip?.rect(in: moved) == CGRect(x: 404, y: 12, width: 756, height: 36), "tg strip: отступы переживают изменение окна")
+    check(strip?.rect(in: CGRect(x: 0, y: 0, width: 500, height: 800)) == nil, "tg strip: слишком узкое окно")
+    check(Telegram.HeaderStrip(window: win, input: CGRect(x: 2000, y: 0, width: 100, height: 20)) == nil, "tg strip: поле ввода вне окна")
+}
+// Выбор названия из строк OCR (box нормализован, начало внизу слева)
+do {
+    func line(_ t: String, x: CGFloat, y: CGFloat, h: CGFloat = 0.3) -> Telegram.OCRLine {
+        Telegram.OCRLine(text: t, box: CGRect(x: x, y: y - h / 2, width: 0.2, height: h))
+    }
+    check(Telegram.chatTitle(from: [line("5 учасників", x: 0.1, y: 0.25, h: 0.22), line("Inweb / SEO", x: 0.1, y: 0.66)]) == "Inweb / SEO", "tg ocr: верхняя строка — название")
+    check(Telegram.chatTitle(from: [line("Sales", x: 0.4, y: 0.65), line("Arsenal", x: 0.1, y: 0.67), line("в мережі", x: 0.1, y: 0.24, h: 0.2)]) == "Arsenal Sales", "tg ocr: куски строки слева направо")
+    check(Telegram.chatTitle(from: [line("12", x: 0.01, y: 0.66), line("Техноїжак", x: 0.1, y: 0.65)]) == "Техноїжак", "tg ocr: счётчик слева отбрасывается")
+    check(Telegram.chatTitle(from: [line("Збережене", x: 0.1, y: 0.5)]) == "Збережене", "tg ocr: название без статуса по центру")
+    // Замер на Telegram 13: аватар «C» без фото слева, название, под ним статус
+    check(Telegram.chatTitle(from: [Telegram.OCRLine(text: "C", box: CGRect(x: 0.007, y: 0.55, width: 0.02, height: 0.3)),
+                                    line("CCBO (rocks, goals etc)", x: 0.04, y: 0.69), line("177 Messages", x: 0.04, y: 0.28, h: 0.25)])
+          == "CCBO (rocks, goals etc)", "tg ocr: буква аватара слева отбрасывается")
+    check(Telegram.chatTitle(from: [line("друкує…", x: 0.1, y: 0.22, h: 0.2)]) == nil, "tg ocr: одна нижняя строка — не название")
+    check(Telegram.chatTitle(from: []) == nil, "tg ocr: пусто")
+}
+do {
+    let s = try? JSONDecoder().decode(AppSettings.self, from: #"{"idleMinutes": 4}"#.data(using: .utf8)!)
+    check(s?.telegramOCR == false, "settings: OCR Telegram по умолчанию выключен")
+    var on = AppSettings(); on.telegramOCR = true
+    let back = try? JSONDecoder().decode(AppSettings.self, from: JSONEncoder().encode(on))
+    check(back?.telegramOCR == true, "settings: OCR Telegram сохраняется")
 }
 
 // MARK: Report

@@ -7,6 +7,9 @@ final class Sensors {
     private(set) var asleep = false
     private var urlPolicy = URLCachePolicy()
     private let urlQueue = DispatchQueue(label: "timechecker.browser-url")
+    let telegram = TelegramReader()
+    /// Распознавать название чата Telegram: опция включена и есть «Запись экрана». Ставит AppModel.
+    var telegramOCR = false
 
     init() {
         let dnc = DistributedNotificationCenter.default()
@@ -48,7 +51,15 @@ final class Sensors {
         let bundle = app.bundleIdentifier ?? ""
         if bundle == "com.apple.loginwindow" || bundle == "com.apple.ScreenSaver.Engine" { return nil }
         let name = app.localizedName ?? bundle
-        let title = Self.windowTitle(pid: app.processIdentifier) ?? ""
+        // У Telegram заголовок окна — «Telegram @ аккаунт» в любом чате, правилам он только мешает.
+        // Вместо него — название чата, если включено распознавание шапки, иначе пусто.
+        let title: String
+        if Telegram.isTelegram(bundle) {
+            title = Telegram.windowTitle(chat: telegramOCR ? telegram.chat(pid: app.processIdentifier) : nil)
+        } else {
+            telegram.deactivate()
+            title = Self.windowTitle(pid: app.processIdentifier) ?? ""
+        }
         var url: String? = nil
         if Browsers.chromium.contains(bundle) || Browsers.safari.contains(bundle) {
             // AppleScript — в фоне: первый запрос ждёт ответа на диалог «Автоматизация», UI не должен виснуть.

@@ -40,6 +40,8 @@ struct AppSettings: Codable, Equatable {
     var idleMinutes = 3
     var roundingMinutes = 5
     var commentMaxItems = 5
+    /// Распознавать название чата в шапке Telegram (нужна «Запись экрана»). По умолчанию выключено.
+    var telegramOCR = false
 
     init() {}
 
@@ -49,6 +51,7 @@ struct AppSettings: Codable, Equatable {
         idleMinutes = try c.decodeIfPresent(Int.self, forKey: .idleMinutes) ?? d.idleMinutes
         roundingMinutes = try c.decodeIfPresent(Int.self, forKey: .roundingMinutes) ?? d.roundingMinutes
         commentMaxItems = try c.decodeIfPresent(Int.self, forKey: .commentMaxItems) ?? d.commentMaxItems
+        telegramOCR = try c.decodeIfPresent(Bool.self, forKey: .telegramOCR) ?? d.telegramOCR
     }
 }
 

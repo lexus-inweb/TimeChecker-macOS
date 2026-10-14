@@ -25,10 +25,13 @@ enum Classifier {
             let hit = p.domains.contains { rule in titleDomains.contains { Domain.matches($0, rule: rule) } }
             if hit { return p.id }
         }
+        // Фразы сверяем без разницы между одинаковыми на вид кириллицей и латиницей:
+        // распознанное название чата Telegram приходит как «СEО» вместо «CEO».
+        let titleKey = Lookalikes.key(title)
         for p in live {
             let hit = p.keywords.contains { raw in
                 let k = raw.trimmingCharacters(in: .whitespaces).lowercased()
-                return !k.isEmpty && (title.contains(k) || url.contains(k))
+                return !k.isEmpty && (titleKey.contains(Lookalikes.key(k)) || url.contains(k))
             }
             if hit { return p.id }
         }
