@@ -136,7 +136,7 @@ do {
     e.tick(now: beforeMidnight, idleSeconds: 0, snapshot: chrome, away: false)
     let r1 = e.tick(now: beforeMidnight.addingTimeInterval(1), idleSeconds: 0, snapshot: chrome, away: false)
     let finished = e.tick(now: beforeMidnight.addingTimeInterval(4), idleSeconds: 0, snapshot: chrome, away: false)
-    check(r1 == nil && finished?.count == 1 && finished?[0].duration == 2, "engine: полночь закрывает вчерашний день")
+    check(r1.isEmpty && finished.count == 1 && finished[0].sessions.count == 1 && finished[0].sessions[0].duration == 2, "engine: полночь закрывает вчерашний день")
     check(e.sessions.count == 1 && e.sessions[0].duration == 2 && e.sessions[0].app == "Google Chrome", "engine: отрезок продолжается после полуночи")
 }
 do {
@@ -145,8 +145,7 @@ do {
     e.tick(now: at(0.4), idleSeconds: 0, snapshot: tg, away: false)
     e.tick(now: at(10), idleSeconds: 0, snapshot: tg, away: false)
     check(e.sessions.count == 1 && e.sessions[0].app == "Telegram", "engine: отрезки < 1 сек отбрасываются")
-    var copy = e.sessions; copy[0].projectId = ti.id
-    e.replaceSessions(copy)
+    e.assign([e.sessions[0].id], to: ti.id)
     e.tick(now: at(12), idleSeconds: 0, snapshot: tg, away: false)
     check(e.sessions.count == 1 && e.sessions[0].projectId == ti.id && e.sessions[0].end == at(12), "engine: ручной перенос не рвёт текущий отрезок")
 }
@@ -178,6 +177,8 @@ do {
     check(store.loadSettings().idleMinutes == 7 && store.loadSettings().roundingMinutes == 5, "store: старые настройки без новых полей")
     try? FileManager.default.removeItem(at: dir)
 }
+
+runRegressionTests()
 
 print("\(passed) passed, \(failed) failed")
 exit(failed == 0 ? 0 : 1)

@@ -1,7 +1,17 @@
 import Foundation
 
+/// Отрезки одного календарного дня — то, что ложится в days/<дата>.json.
+struct DayLog: Equatable {
+    var day: Date
+    var sessions: [Session]
+}
+
 /// Чистая логика трекера: получает «что сейчас на экране» раз в секунду и режет время на отрезки.
 /// Ничего не знает про AppKit — поэтому покрыта тестами.
+///
+/// Граница дня: массив `sessions` начинается в дне `day` и может временно залезать за полночь —
+/// пока не ясно, не окажется ли время после последнего ввода простоем (максимум `idleThreshold`).
+/// Как только ясно, массив режется по каждой пройденной полуночи и готовые дни отдаются наружу.
 final class TrackerEngine {
     private(set) var sessions: [Session]
     private(set) var currentIndex: Int?
@@ -12,78 +22,148 @@ final class TrackerEngine {
     /// Если между тиками прошло больше — мак спал или процесс был приостановлен.
     var gapThreshold: TimeInterval = 30
     var calendar = Calendar.current
+    private var dayStart: Date?
 
-    init(sessions: [Session] = [], idleThreshold: TimeInterval = 180) {
+    init(sessions: [Session] = [], day: Date? = nil, idleThreshold: TimeInterval = 180) {
         self.sessions = sessions
         self.idleThreshold = idleThreshold
+        if let d = day ?? sessions.first?.start { dayStart = Calendar.current.startOfDay(for: d) }
     }
+
+    /// Начало дня, к которому относится массив `sessions`.
+    var day: Date { dayStart ?? calendar.startOfDay(for: sessions.first?.start ?? Date()) }
 
     var current: Session? { currentIndex.map { sessions[$0] } }
 
-    /// Один тик. Возвращает сессии завершившегося дня, если перешли через полночь.
+    /// Один тик. Возвращает дни, которые этим тиком закрылись (после многодневного сна — несколько).
     @discardableResult
-    func tick(now: Date, idleSeconds: TimeInterval, snapshot: ActivitySnapshot?, away: Bool) -> [Session]? {
-        var finishedDay: [Session]? = nil
+    func tick(now: Date, idleSeconds: TimeInterval, snapshot: ActivitySnapshot?, away: Bool) -> [DayLog] {
+        var finished: [DayLog] = []
+        if sessions.isEmpty && currentIndex == nil { dayStart = calendar.startOfDay(for: now) }
 
-        if let last = lastTick, !calendar.isDate(last, inSameDayAs: now) {
-            let midnight = calendar.startOfDay(for: now)
-            let wasGap = now.timeIntervalSince(last) > gapThreshold
-            let carry = current
-            closeCurrent(at: wasGap ? last : midnight)
-            if wasGap && midnight > last { append(Session(start: last, end: midnight, kind: .away)) }
-            finishedDay = sessions
-            sessions = []
-            currentIndex = nil
-            if wasGap {
-                if now > midnight { append(Session(start: midnight, end: now, kind: .away)) }
-            } else if var c = carry {
-                c.id = UUID(); c.start = midnight; c.end = midnight; c.projectId = nil
-                sessions.append(c); currentIndex = sessions.count - 1
-            }
-            lastTick = now
+        if lastTick == nil {
+            // Запуск или продолжение после паузы: пропущенные полуночи закрываем без отлучек — пауза не считается.
+            finished += settle(now: now, idleSeconds: 0, force: true)
+            trackingSince = now
         } else if let last = lastTick, now.timeIntervalSince(last) > gapThreshold, current?.kind != .away {
             closeCurrent(at: last)
-            append(Session(start: last, end: now, kind: .away))
+            append(Session(start: last, end: now, kind: .away)) // по дням его разрежет settle
         }
-        if lastTick == nil { trackingSince = now }
         lastTick = now
 
         if away {
             continueOrStart(kind: .away, snapshot: nil, from: now, now: now)
-            return finishedDay
-        }
-
-        if idleSeconds >= idleThreshold {
-            let idleStart = now.addingTimeInterval(-idleSeconds)
-            if let c = current, c.kind == .active {
-                closeCurrent(at: max(c.start, idleStart))
-            }
-            continueOrStart(kind: .idle, snapshot: nil, from: max(idleStart, sessions.last?.end ?? idleStart, trackingSince ?? idleStart), now: now)
-            return finishedDay
-        }
-
-        guard let snap = snapshot else {
+        } else if idleSeconds >= idleThreshold {
+            let idleStart = max(now.addingTimeInterval(-idleSeconds), trackingSince ?? .distantPast)
+            // Заголовок мог меняться и без ввода (обновилась страница, пришло сообщение) —
+            // всё активное после последнего ввода задним числом становится простоем.
+            reclassifyAsIdle(after: idleStart)
+            continueOrStart(kind: .idle, snapshot: nil, from: max(idleStart, sessions.last?.end ?? idleStart), now: now)
+        } else if let snap = snapshot {
+            continueOrStart(kind: .active, snapshot: snap, from: now, now: now)
+        } else {
             continueOrStart(kind: .away, snapshot: nil, from: now, now: now)
-            return finishedDay
         }
-        continueOrStart(kind: .active, snapshot: snap, from: now, now: now)
-        return finishedDay
+
+        finished += settle(now: now, idleSeconds: idleSeconds, force: false)
+        return finished
     }
 
-    /// Пауза/выход: закрыть текущий отрезок.
-    func stop(at now: Date) {
+    /// Пауза/выход: закрыть текущий отрезок и все дни, которые уже кончились.
+    @discardableResult
+    func stop(at now: Date) -> [DayLog] {
         closeCurrent(at: now)
         lastTick = nil
+        return settle(now: now, idleSeconds: 0, force: true)
     }
 
-    /// Заменить сессии (после ручного переноса в проект). Текущий отрезок сохраняет свою позицию по id.
-    func replaceSessions(_ new: [Session]) {
-        let currentId = current?.id
-        sessions = new
-        currentIndex = currentId.flatMap { id in sessions.firstIndex { $0.id == id } }
+    /// Смена дня, пока трекер стоит на паузе (тики не идут, а «сегодня» должно стать новым днём).
+    @discardableResult
+    func rollover(at now: Date) -> [DayLog] {
+        guard lastTick == nil else { return [] }
+        let out = settle(now: now, idleSeconds: 0, force: true)
+        if sessions.isEmpty { dayStart = calendar.startOfDay(for: now) }
+        return out
+    }
+
+    /// Текущий массив, разрезанный по дням, без изменения состояния — для сохранения и интерфейса.
+    func dayLogs() -> [DayLog] {
+        var rest = sessions, d = day, out: [DayLog] = []
+        while let boundary = calendar.date(byAdding: .day, value: 1, to: d), rest.contains(where: { $0.end > boundary }) {
+            let (left, right) = Self.split(rest, at: boundary)
+            out.append(DayLog(day: d, sessions: left))
+            rest = right; d = boundary
+        }
+        out.append(DayLog(day: d, sessions: rest))
+        return out
+    }
+
+    /// Ручное отнесение к проекту (nil — вернуть на автоматические правила). Текущий отрезок не рвётся.
+    func assign(_ ids: Set<UUID>, to projectId: UUID?) {
+        for i in sessions.indices where ids.contains(sessions[i].id) { sessions[i].projectId = projectId }
+    }
+
+    /// Режет отрезки по границе. Отрезок, пересекающий её, делится на два с тем же id —
+    /// это одно занятие, просто записанное в два дня.
+    static func split(_ list: [Session], at boundary: Date) -> (left: [Session], right: [Session]) {
+        var left: [Session] = [], right: [Session] = []
+        for s in list {
+            if s.end <= boundary { left.append(s) }
+            else if s.start >= boundary { right.append(s) }
+            else {
+                var a = s; a.end = boundary; left.append(a)
+                var b = s; b.start = boundary; right.append(b)
+            }
+        }
+        return (left, right)
     }
 
     // MARK: - private
+
+    /// Отрезает от массива все дни, которые уже кончились.
+    /// Без force ждёт, пока не станет ясно, не съест ли простой задним числом время до полуночи.
+    private func settle(now: Date, idleSeconds: TimeInterval, force: Bool) -> [DayLog] {
+        var out: [DayLog] = []
+        while let boundary = calendar.date(byAdding: .day, value: 1, to: day), now >= boundary {
+            if !force {
+                let lastInput = now.addingTimeInterval(-idleSeconds)
+                let undecided = idleSeconds < idleThreshold && lastInput < boundary &&
+                    sessions.contains { $0.kind == .active && $0.end > lastInput }
+                if undecided { break }
+            }
+            let currentId = current?.id
+            let (left, right) = Self.split(sessions, at: boundary)
+            out.append(DayLog(day: day, sessions: left))
+            sessions = right
+            currentIndex = currentId.flatMap { id in sessions.lastIndex { $0.id == id } }
+            dayStart = boundary
+        }
+        return out
+    }
+
+    private func reclassifyAsIdle(after t: Date) {
+        guard sessions.contains(where: { $0.kind == .active && $0.end > t }) else { return }
+        let currentId = current?.id
+        var out: [Session] = []
+        var newCurrent: Int?
+        for s in sessions {
+            guard s.kind == .active, s.end > t else {
+                out.append(s)
+                if s.id == currentId { newCurrent = out.count - 1 }
+                continue
+            }
+            if s.start < t { var a = s; a.end = t; out.append(a) }
+            let idleStart = max(s.start, t)
+            if let last = out.last, last.kind == .idle, last.projectId == nil, idleStart.timeIntervalSince(last.end) <= 1 {
+                out[out.count - 1].end = max(last.end, s.end)
+            } else {
+                out.append(Session(start: idleStart, end: s.end, kind: .idle))
+            }
+            if s.id == currentId { newCurrent = out.count - 1 }
+        }
+        sessions = out
+        currentIndex = newCurrent
+    }
 
     private func same(_ s: Session, kind: SessionKind, snapshot: ActivitySnapshot?) -> Bool {
         guard s.kind == kind else { return false }

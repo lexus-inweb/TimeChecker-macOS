@@ -5,8 +5,7 @@ import ApplicationServices
 final class Sensors {
     private(set) var screenLocked = false
     private(set) var asleep = false
-    private var urlCache: (key: String, url: String?)?
-    private var fetchingKey: String?
+    private var urlPolicy = URLCachePolicy()
     private let urlQueue = DispatchQueue(label: "timechecker.browser-url")
 
     init() {
@@ -51,19 +50,16 @@ final class Sensors {
         let name = app.localizedName ?? bundle
         let title = Self.windowTitle(pid: app.processIdentifier) ?? ""
         var url: String? = nil
-        if Browsers.isBrowser(bundle) {
-            // AppleScript дергаем только когда сменилось окно/вкладка, и в фоне: первый запрос
-            // ждёт, пока пользователь ответит на диалог «Автоматизация», — UI при этом не должен виснуть.
-            let key = bundle + "|" + title
-            if let c = urlCache, c.key == key {
-                url = c.url
-            } else if fetchingKey == nil {
-                fetchingKey = key
+        if Browsers.chromium.contains(bundle) || Browsers.safari.contains(bundle) {
+            // AppleScript — в фоне: первый запрос ждёт ответа на диалог «Автоматизация», UI не должен виснуть.
+            // Когда перечитывать и какой ответ отбросить, решает URLCachePolicy.
+            let (known, requestId) = urlPolicy.lookup(key: bundle + "|" + title, now: Date())
+            url = known
+            if let id = requestId {
                 urlQueue.async {
-                    let fetched = Self.browserURL(bundleId: bundle)
+                    let tab = Self.browserTab(bundleId: bundle)
                     DispatchQueue.main.async {
-                        self.urlCache = (key, fetched)
-                        self.fetchingKey = nil
+                        self.urlPolicy.complete(requestId: id, url: tab?.url, tabTitle: tab?.title, windowTitle: title, now: Date())
                     }
                 }
             }
@@ -81,18 +77,21 @@ final class Sensors {
         return title as? String
     }
 
-    private static func browserURL(bundleId: String) -> String? {
+    /// Заголовок и адрес активной вкладки. Заголовок нужен, чтобы отбросить ответ про другую вкладку.
+    /// Firefox через AppleScript адрес не отдаёт — для него работаем только по заголовку окна.
+    private static func browserTab(bundleId: String) -> (title: String?, url: String?)? {
         let src: String
         if Browsers.chromium.contains(bundleId) {
-            src = "tell application id \"\(bundleId)\" to if (count of windows) > 0 then return URL of active tab of front window"
+            src = "tell application id \"\(bundleId)\" to if (count of windows) > 0 then tell active tab of front window to return {title, URL}"
         } else if Browsers.safari.contains(bundleId) {
-            src = "tell application id \"\(bundleId)\" to if (count of documents) > 0 then return URL of front document"
+            src = "tell application id \"\(bundleId)\" to if (count of windows) > 0 then tell current tab of front window to return {name, URL}"
         } else {
-            return nil // Firefox не отдаёт адрес через AppleScript — работаем по заголовку
+            return nil
         }
         var err: NSDictionary?
-        let result = NSAppleScript(source: src)?.executeAndReturnError(&err)
-        guard err == nil, let s = result?.stringValue, !s.isEmpty else { return nil }
-        return s
+        guard let result = NSAppleScript(source: src)?.executeAndReturnError(&err), err == nil,
+              result.numberOfItems == 2 else { return nil }
+        let url = result.atIndex(2)?.stringValue
+        return (result.atIndex(1)?.stringValue, url?.isEmpty == false ? url : nil)
     }
 }

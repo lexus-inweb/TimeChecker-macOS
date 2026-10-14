@@ -20,11 +20,9 @@ enum Classifier {
                 return p.id
             }
         }
+        let titleDomains = Domain.candidates(in: title)
         for p in live {
-            let hit = p.domains.contains { rule in
-                let r = Domain.normalizeRule(rule)
-                return r.contains(".") && title.contains(r)
-            }
+            let hit = p.domains.contains { rule in titleDomains.contains { Domain.matches($0, rule: rule) } }
             if hit { return p.id }
         }
         for p in live {
@@ -44,6 +42,21 @@ enum Classifier {
         }
         return nil
     }
+}
+
+extension Domain {
+    /// Похожие на домены слова из заголовка: "ti.ua — Search Console" → ["ti.ua"].
+    /// Сверяются через matches(), поэтому правило "ti.ua" не ловит "notti.ua".
+    static func candidates(in text: String) -> [String] {
+        let ns = text.lowercased() as NSString
+        return candidateRegex.matches(in: ns as String, range: NSRange(location: 0, length: ns.length)).map {
+            var d = ns.substring(with: $0.range)
+            if d.hasPrefix("www.") { d.removeFirst(4) }
+            return d
+        }
+    }
+
+    private static let candidateRegex = try! NSRegularExpression(pattern: #"(?<![\p{L}\p{N}.-])(?:[\p{L}\p{N}](?:[\p{L}\p{N}-]*[\p{L}\p{N}])?\.)+\p{L}{2,}(?![\p{L}\p{N}-])"#)
 }
 
 // MARK: - Отчёт

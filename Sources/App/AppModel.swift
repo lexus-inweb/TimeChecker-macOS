@@ -9,6 +9,8 @@ final class AppModel: ObservableObject {
     private var timer: Timer?
     private var tickCount = 0
     private var dayCache: [String: [Session]] = [:]
+    /// Дни, которые ещё в памяти трекера: сегодня и — первые минуты после полуночи — вчера.
+    private var held: [DayLog] = []
 
     @Published private(set) var today: [Session] = []
     @Published var projects: [Project] { didSet { store.saveProjects(projects) } }
@@ -25,8 +27,8 @@ final class AppModel: ObservableObject {
         settings = s
         projects = store.loadProjects()
         comments = store.loadComments()
-        engine = TrackerEngine(sessions: store.loadDay(Date()), idleThreshold: TimeInterval(s.idleMinutes * 60))
-        today = engine.sessions
+        engine = TrackerEngine(sessions: store.loadDay(Date()), day: Date(), idleThreshold: TimeInterval(s.idleMinutes * 60))
+        refresh()
 
         if !axTrusted { Sensors.requestAccessibility() }
         let t = Timer(timeInterval: 1, repeats: true) { [weak self] _ in self?.tick() }
@@ -34,8 +36,8 @@ final class AppModel: ObservableObject {
         timer = t
         NotificationCenter.default.addObserver(forName: NSApplication.willTerminateNotification, object: nil, queue: .main) { [weak self] _ in
             guard let self else { return }
-            self.engine.stop(at: Date())
-            self.store.saveDay(Date(), self.engine.sessions)
+            self.save(self.engine.stop(at: Date()))
+            self.save(self.engine.dayLogs())
         }
     }
 
@@ -49,24 +51,50 @@ final class AppModel: ObservableObject {
             let trusted = Sensors.accessibilityTrusted
             if trusted != axTrusted { axTrusted = trusted }
         }
-        guard !paused else { return }
         let now = Date()
+        if paused {
+            // На паузе время не пишется, но смену дня отработать надо — иначе «сегодня» останется вчерашним.
+            let finished = engine.rollover(at: now)
+            if !finished.isEmpty { save(finished); save(engine.dayLogs()) }
+            if !finished.isEmpty || tickCount % 10 == 0 { refresh() }
+            return
+        }
         let countBefore = engine.sessions.count
         let snap = sensors.away ? nil : sensors.snapshot()
-        if let finished = engine.tick(now: now, idleSeconds: sensors.idleSeconds, snapshot: snap, away: sensors.away) {
-            let yesterday = finished.first?.start ?? now.addingTimeInterval(-86400)
-            store.saveDay(yesterday, finished)
-            dayCache[FileStore.dayKey(yesterday)] = finished
-        }
+        let finished = engine.tick(now: now, idleSeconds: sensors.idleSeconds, snapshot: snap, away: sensors.away)
+        if !finished.isEmpty { save(finished); save(engine.dayLogs()) }
         let cur = engine.current
         if cur?.id != current?.id || cur?.kind != current?.kind { current = cur }
-        if engine.sessions.count != countBefore || tickCount % 10 == 0 { today = engine.sessions }
-        if tickCount % 15 == 0 { store.saveDay(now, engine.sessions) }
+        if !finished.isEmpty || engine.sessions.count != countBefore || tickCount % 10 == 0 { refresh() }
+        if tickCount % 15 == 0 { save(engine.dayLogs()) }
     }
 
     func togglePause() {
         paused.toggle()
-        if paused { engine.stop(at: Date()); current = nil; today = engine.sessions; store.saveDay(Date(), engine.sessions) }
+        if paused {
+            save(engine.stop(at: Date()))
+            save(engine.dayLogs())
+            current = nil
+            refresh()
+        }
+    }
+
+    /// Каждый день — в свой файл: трекер сам режет отрезки по полуночи.
+    private func save(_ logs: [DayLog]) {
+        for l in logs {
+            store.saveDay(l.day, l.sessions)
+            dayCache[FileStore.dayKey(l.day)] = l.sessions
+        }
+    }
+
+    private func refresh() {
+        held = engine.dayLogs()
+        let t = held.first { isToday($0.day) }?.sessions ?? []
+        if t != today { today = t }
+    }
+
+    private func heldIndex(_ day: Date) -> Int? {
+        held.firstIndex { Calendar.current.isDate($0.day, inSameDayAs: day) }
     }
 
     // MARK: - Данные по дням
@@ -74,7 +102,7 @@ final class AppModel: ObservableObject {
     func isToday(_ d: Date) -> Bool { Calendar.current.isDateInToday(d) }
 
     func sessions(on day: Date) -> [Session] {
-        if isToday(day) { return today }
+        if let i = heldIndex(day) { return held[i].sessions }
         let key = FileStore.dayKey(day)
         if let c = dayCache[key] { return c }
         let s = store.loadDay(day)
@@ -94,13 +122,14 @@ final class AppModel: ObservableObject {
 
     /// Перенести отрезки в проект (nil — вернуть на автоматические правила).
     func assign(_ ids: Set<UUID>, to projectId: UUID?, on day: Date) {
-        var list = sessions(on: day)
-        for i in list.indices where ids.contains(list[i].id) { list[i].projectId = projectId }
-        if isToday(day) {
-            engine.replaceSessions(list)
-            today = engine.sessions
-            store.saveDay(day, engine.sessions)
+        if heldIndex(day) != nil {
+            engine.assign(ids, to: projectId)
+            refresh()
+            save(held)
+            objectWillChange.send()
         } else {
+            var list = sessions(on: day)
+            for i in list.indices where ids.contains(list[i].id) { list[i].projectId = projectId }
             dayCache[FileStore.dayKey(day)] = list
             store.saveDay(day, list)
             objectWillChange.send()
