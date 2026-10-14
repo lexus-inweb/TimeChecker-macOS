@@ -15,7 +15,7 @@ struct DayPicker: View {
             Button { shift(1) } label: { Image(systemName: "chevron.right") }
                 .disabled(Calendar.current.isDateInToday(day))
             if !Calendar.current.isDateInToday(day) {
-                Button("Сегодня") { day = Date() }
+                Button("Сьогодні") { day = Date() }
             }
         }
     }
@@ -74,10 +74,10 @@ struct AccessWarning: View {
         HStack(alignment: .top, spacing: 8) {
             Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange)
             VStack(alignment: .leading, spacing: 4) {
-                Text("Нет доступа к заголовкам окон").font(.callout.weight(.semibold))
-                Text("Разреши Time Checker в «Универсальном доступе», иначе видно только приложение, без названия вкладки.")
+                Text("Немає доступу до заголовків вікон").font(.callout.weight(.semibold))
+                Text("Дозволь Time Checker у «Доступності», інакше видно лише програму, без назви вкладки.")
                     .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
-                Button("Открыть настройки") { Sensors.openAccessibilitySettings() }.controlSize(.small)
+                Button("Відкрити налаштування") { Sensors.openAccessibilitySettings() }.controlSize(.small)
             }
         }
         .padding(8)
@@ -109,20 +109,20 @@ struct MenuPopover: View {
         let st = Stats.build(model.today, projects: model.projects)
         VStack(alignment: .leading, spacing: 10) {
             HStack {
-                Text("Сегодня").font(.headline)
+                Text("Сьогодні").font(.headline)
                 Spacer()
-                Text("на проекты \(hm(st.projectsTotal))").foregroundStyle(.secondary).monospacedDigit()
+                Text("на проєкти \(hm(st.projectsTotal))").foregroundStyle(.secondary).monospacedDigit()
             }
             if !model.axTrusted { AccessWarning() }
             if let c = model.current {
                 Label(nowText(c), systemImage: model.project(Classifier.projectId(for: c, projects: model.projects)) == nil ? "circle.dashed" : "checkmark.circle")
                     .font(.caption).foregroundStyle(.secondary).lineLimit(1)
             } else if model.paused {
-                Label("Пауза — время не считается", systemImage: "pause.circle").font(.caption).foregroundStyle(.orange)
+                Label("Пауза — час не рахується", systemImage: "pause.circle").font(.caption).foregroundStyle(.orange)
             }
             Divider()
             if lines.isEmpty {
-                Text(model.projects.isEmpty ? "Добавь проекты и правила — тогда здесь появится отчёт." : "Пока ничего не попало в проекты.")
+                Text(model.projects.isEmpty ? "Додай проєкти й правила — тоді тут з'явиться звіт." : "Поки нічого не потрапило в проєкти.")
                     .font(.callout).foregroundStyle(.secondary)
             } else {
                 ScrollView {
@@ -144,23 +144,23 @@ struct MenuPopover: View {
             }
             Divider()
             HStack {
-                Text("Другое \(hm(st.otherSeconds))")
+                Text("Інше \(hm(st.otherSeconds))")
                 Text("·").foregroundStyle(.tertiary)
-                Text("Простой \(hm(st.idleSeconds))")
+                Text("Простій \(hm(st.idleSeconds))")
             }
             .font(.caption).foregroundStyle(.secondary)
             HStack {
-                Button(copied ? "Скопировано ✓" : "Копировать отчёт") {
+                Button(copied ? "Скопійовано ✓" : "Копіювати звіт") {
                     model.copyReport(on: day); copied = true
                     DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { copied = false }
                 }
                 .keyboardShortcut(.defaultAction)
                 .disabled(lines.isEmpty)
-                Button("Открыть…") { open() }
+                Button("Відкрити…") { open() }
                 Spacer()
                 Button { model.togglePause() } label: { Image(systemName: model.paused ? "play.fill" : "pause.fill") }
-                    .help(model.paused ? "Продолжить" : "Пауза")
-                Button { NSApp.terminate(nil) } label: { Image(systemName: "power") }.help("Выйти")
+                    .help(model.paused ? "Продовжити" : "Пауза")
+                Button { NSApp.terminate(nil) } label: { Image(systemName: "power") }.help("Вийти")
             }
         }
         .padding(14)
@@ -169,11 +169,11 @@ struct MenuPopover: View {
 
     private func nowText(_ s: Session) -> String {
         switch s.kind {
-        case .idle: return "Сейчас: простой"
-        case .away: return "Сейчас: нет за компьютером"
+        case .idle: return "Зараз: простій"
+        case .away: return "Зараз: не за комп'ютером"
         case .active:
             let what = s.domain ?? (s.title.isEmpty ? s.app : s.title)
-            return "Сейчас: \(s.app) — \(what)"
+            return "Зараз: \(s.app) — \(what)"
         }
     }
 
@@ -194,12 +194,12 @@ struct MainView: View {
 
     var body: some View {
         TabView(selection: $tab) {
-            page(.report) { ReportView(day: $day, tab: $tab) }.tabItem { Label("Отчёт", systemImage: "doc.text") }.tag(MainTab.report)
-            page(.other) { OtherView(day: $day) }.tabItem { Label("Другое", systemImage: "tray") }.tag(MainTab.other)
+            page(.report) { ReportView(day: $day, tab: $tab) }.tabItem { Label("Звіт", systemImage: "doc.text") }.tag(MainTab.report)
+            page(.other) { OtherView(day: $day) }.tabItem { Label("Інше", systemImage: "tray") }.tag(MainTab.other)
             page(.dashboard) { DashboardView(day: $day) }.tabItem { Label("Дашборд", systemImage: "chart.bar") }.tag(MainTab.dashboard)
-            page(.projects) { ProjectsView() }.tabItem { Label("Проекты", systemImage: "folder") }.tag(MainTab.projects)
-            page(.settings) { SettingsView() }.tabItem { Label("Настройки", systemImage: "gearshape") }.tag(MainTab.settings)
-            page(.help) { HelpView() }.tabItem { Label("Справка", systemImage: "questionmark.circle") }.tag(MainTab.help)
+            page(.projects) { ProjectsView() }.tabItem { Label("Проєкти", systemImage: "folder") }.tag(MainTab.projects)
+            page(.settings) { SettingsView() }.tabItem { Label("Налаштування", systemImage: "gearshape") }.tag(MainTab.settings)
+            page(.help) { HelpView() }.tabItem { Label("Довідка", systemImage: "questionmark.circle") }.tag(MainTab.help)
         }
         .padding(.top, 4)
     }
@@ -227,7 +227,7 @@ struct ReportView: View {
             HStack {
                 DayPicker(day: $day)
                 Spacer()
-                Button(copied ? "Скопировано ✓" : "Копировать отчёт") {
+                Button(copied ? "Скопійовано ✓" : "Копіювати звіт") {
                     model.copyReport(on: day); copied = true
                     DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { copied = false }
                 }
@@ -237,16 +237,16 @@ struct ReportView: View {
             }
             if !model.axTrusted { AccessWarning() }
             HStack(spacing: 10) {
-                StatTile(title: "На проекты", seconds: st.projectsTotal)
-                StatTile(title: "Другое", seconds: st.otherSeconds, tint: .orange)
-                StatTile(title: "Простой", seconds: st.idleSeconds, tint: .secondary)
-                StatTile(title: "Отлучки / сон", seconds: st.awaySeconds, tint: .secondary)
+                StatTile(title: "На проєкти", seconds: st.projectsTotal)
+                StatTile(title: "Інше", seconds: st.otherSeconds, tint: .orange)
+                StatTile(title: "Простій", seconds: st.idleSeconds, tint: .secondary)
+                StatTile(title: "Відлучки / сон", seconds: st.awaySeconds, tint: .secondary)
             }
             if lines.isEmpty {
-                EmptyHint(title: "Отчёт пуст",
+                EmptyHint(title: "Звіт порожній",
                           text: model.projects.isEmpty
-                            ? "Создай проекты во вкладке «Проекты» и добавь правила: домены, фразы из заголовков, приложения."
-                            : "За этот день ничего не попало в проекты. Загляни в «Другое» — оттуда время переносится в проект.",
+                            ? "Створи проєкти на вкладці «Проєкти» й додай правила: домени, фрази із заголовків, програми."
+                            : "За цей день нічого не потрапило в проєкти. Зазирни в «Інше» — звідти час переноситься в проєкт.",
                           icon: "doc.text.magnifyingglass")
             } else {
                 ScrollView {
@@ -256,7 +256,7 @@ struct ReportView: View {
                 }
             }
             if st.otherSeconds >= 60 {
-                Button("Нераспределено \(hm(st.otherSeconds)) — разобрать в «Другом» →") { tab = .other }
+                Button("Нерозподілено \(hm(st.otherSeconds)) — розібрати в «Іншому» →") { tab = .other }
                     .buttonStyle(.link)
             }
         }
@@ -278,13 +278,13 @@ struct ReportCard: View {
                 Text(Report.format(minutes: line.minutes)).font(.headline).monospacedDigit()
                 Text("(\(hm(line.seconds)) факт)").font(.caption).foregroundStyle(.secondary)
             }
-            TextField("Комментарий", text: Binding(
+            TextField("Коментар", text: Binding(
                 get: { model.comment(line, on: day) },
                 set: { model.setComment($0, for: line, on: day) }
             ), axis: .vertical)
             .lineLimit(1...4)
             .textFieldStyle(.roundedBorder)
-            DisclosureGroup("Откуда время", isExpanded: $showSources) {
+            DisclosureGroup("Звідки час", isExpanded: $showSources) {
                 let mine = model.sessions(on: day).filter { Classifier.projectId(for: $0, projects: model.projects) == line.projectId }
                 VStack(alignment: .leading, spacing: 4) {
                     ForEach(Grouping.byApp(mine)) { g in
@@ -295,7 +295,7 @@ struct ReportCard: View {
                             Text(hm(g.seconds)).monospacedDigit().foregroundStyle(.secondary)
                             Button { model.assign(Set(g.sessionIds), to: nil, on: day) } label: { Image(systemName: "arrow.uturn.backward") }
                                 .buttonStyle(.borderless)
-                                .help("Снять ручное отнесение (если правило ловит — останется в проекте)")
+                                .help("Зняти ручне віднесення (якщо правило ловить — залишиться в проєкті)")
                         }
                         .font(.caption)
                     }
@@ -313,7 +313,7 @@ struct ReportCard: View {
 // MARK: Другое
 
 enum OtherMode: String, CaseIterable, Identifiable {
-    case chrono = "По сессиям", byApp = "По программам"
+    case chrono = "За сесіями", byApp = "За програмами"
     var id: String { rawValue }
 }
 
@@ -337,44 +337,44 @@ struct OtherView: View {
                 Spacer()
                 Picker("", selection: $mode) { ForEach(OtherMode.allCases) { Text($0.rawValue).tag($0) } }
                     .pickerStyle(.segmented).labelsHidden().fixedSize()
-                Toggle("Простой и отлучки", isOn: $includeIdle)
+                Toggle("Простій і відлучки", isOn: $includeIdle)
             }
             HStack {
-                Text("\(groups.count) записей · \(hm(src.reduce(0) { $0 + $1.duration }))").foregroundStyle(.secondary)
+                Text("\(groups.count) записів · \(hm(src.reduce(0) { $0 + $1.duration }))").foregroundStyle(.secondary)
                 Spacer()
-                if !selection.isEmpty { Text("Выбрано: \(hm(src.filter { selectedIds.contains($0.id) }.reduce(0) { $0 + $1.duration }))").foregroundStyle(.secondary) }
-                assignMenu(ids: selectedIds, title: "Отнести выбранное к проекту")
+                if !selection.isEmpty { Text("Вибрано: \(hm(src.filter { selectedIds.contains($0.id) }.reduce(0) { $0 + $1.duration }))").foregroundStyle(.secondary) }
+                assignMenu(ids: selectedIds, title: "Віднести вибране до проєкту")
                     .disabled(selectedIds.isEmpty)
                     .fixedSize()
             }
             if groups.isEmpty {
-                EmptyHint(title: "Всё разобрано", text: "Нераспределённого времени за этот день нет.", icon: "checkmark.seal")
+                EmptyHint(title: "Усе розібрано", text: "Нерозподіленого часу за цей день немає.", icon: "checkmark.seal")
             } else {
                 List(groups, selection: $selection) { g in
                     OtherRow(group: g, showTime: mode == .chrono)
                         .contextMenu {
-                            assignMenu(ids: Set(g.sessionIds), title: "Отнести к проекту")
+                            assignMenu(ids: Set(g.sessionIds), title: "Віднести до проєкту")
                             ruleMenu(g)
                         }
                 }
                 .listStyle(.inset(alternatesRowBackgrounds: true))
-                Text("⌘-клик / Shift-клик — выбрать несколько. Правый клик — отнести или создать правило на будущее.")
+                Text("⌘-клік / Shift-клік — вибрати кілька. Правий клік — віднести або створити правило на майбутнє.")
                     .font(.caption).foregroundStyle(.secondary)
             }
         }
         .padding()
         .onChange(of: day) { selection = [] }
         .onChange(of: mode) { selection = [] }
-        .alert("Новый проект", isPresented: $askNewProject) {
-            TextField("Название", text: $newProjectName)
-            Button("Создать и отнести") {
+        .alert("Новий проєкт", isPresented: $askNewProject) {
+            TextField("Назва", text: $newProjectName)
+            Button("Створити й віднести") {
                 let name = newProjectName.trimmingCharacters(in: .whitespaces)
                 guard !name.isEmpty else { return }
                 let p = model.addProject(name: name)
                 model.assign(pendingIds, to: p.id, on: day)
                 selection = []
             }
-            Button("Отмена", role: .cancel) {}
+            Button("Скасувати", role: .cancel) {}
         }
     }
 
@@ -385,7 +385,7 @@ struct OtherView: View {
                 Button(p.name) { model.assign(ids, to: p.id, on: day); selection = [] }
             }
             Divider()
-            Button("Новый проект…") { pendingIds = ids; newProjectName = ""; askNewProject = true }
+            Button("Новий проєкт…") { pendingIds = ids; newProjectName = ""; askNewProject = true }
         }
     }
 
@@ -393,11 +393,11 @@ struct OtherView: View {
     private func ruleMenu(_ g: SessionGroup) -> some View {
         if g.kind == .active {
             if let d = g.domain {
-                Menu("Всегда относить сайт \(d) к…") {
+                Menu("Завжди відносити сайт \(d) до…") {
                     ForEach(model.projects.filter { !$0.archived }) { p in Button(p.name) { model.addRule(to: p.id, domain: d) } }
                 }
             } else if !g.app.isEmpty {
-                Menu("Всегда относить приложение \(g.app) к…") {
+                Menu("Завжди відносити програму \(g.app) до…") {
                     ForEach(model.projects.filter { !$0.archived }) { p in Button(p.name) { model.addRule(to: p.id, app: g.app) } }
                 }
             }
@@ -441,7 +441,7 @@ struct OtherRow: View {
 // MARK: Дашборд
 
 enum Period: String, CaseIterable, Identifiable {
-    case day = "День", week = "Неделя", month = "Месяц"
+    case day = "День", week = "Тиждень", month = "Місяць"
     var id: String { rawValue }
 }
 
@@ -483,14 +483,14 @@ struct DashboardView: View {
                         .pickerStyle(.segmented).labelsHidden().fixedSize()
                 }
                 HStack(spacing: 10) {
-                    StatTile(title: "На проекты", seconds: st.projectsTotal)
-                    StatTile(title: "Вне проектов", seconds: st.otherSeconds, tint: .orange)
-                    StatTile(title: "Простой", seconds: st.idleSeconds, tint: .secondary)
+                    StatTile(title: "На проєкти", seconds: st.projectsTotal)
+                    StatTile(title: "Поза проєктами", seconds: st.otherSeconds, tint: .orange)
+                    StatTile(title: "Простій", seconds: st.idleSeconds, tint: .secondary)
                 }
                 if period != .day { dailyChart(from: from, to: to) }
-                section("Проекты", items: st.projectSeconds.compactMap { k, v in model.project(k).map { ($0.name, v) } }, tint: .accentColor)
-                section("Программы", items: st.byApp.map { ($0.key, $0.value) }, tint: .purple)
-                section("Сайты в браузере", items: st.byDomain.map { ($0.key, $0.value) }, tint: .teal)
+                section("Проєкти", items: st.projectSeconds.compactMap { k, v in model.project(k).map { ($0.name, v) } }, tint: .accentColor)
+                section("Програми", items: st.byApp.map { ($0.key, $0.value) }, tint: .purple)
+                section("Сайти в браузері", items: st.byDomain.map { ($0.key, $0.value) }, tint: .teal)
             }
             .padding()
         }
@@ -501,17 +501,17 @@ struct DashboardView: View {
         var d = Calendar.current.startOfDay(for: from)
         while d <= to {
             let s = Stats.build(model.sessions(on: d), projects: model.projects)
-            bars.append(DayBar(date: d, kind: "Проекты", hours: s.projectsTotal / 3600))
-            bars.append(DayBar(date: d, kind: "Вне проектов", hours: s.otherSeconds / 3600))
+            bars.append(DayBar(date: d, kind: "Проєкти", hours: s.projectsTotal / 3600))
+            bars.append(DayBar(date: d, kind: "Поза проєктами", hours: s.otherSeconds / 3600))
             d = Calendar.current.date(byAdding: .day, value: 1, to: d)!
         }
         return VStack(alignment: .leading) {
-            Text("По дням, часы").font(.headline)
+            Text("По днях, години").font(.headline)
             Chart(bars) { b in
-                BarMark(x: .value("День", b.date, unit: .day), y: .value("Часы", b.hours))
+                BarMark(x: .value("День", b.date, unit: .day), y: .value("Години", b.hours))
                     .foregroundStyle(by: .value("Тип", b.kind))
             }
-            .chartForegroundStyleScale(["Проекты": Color.accentColor, "Вне проектов": Color.orange])
+            .chartForegroundStyleScale(["Проєкти": Color.accentColor, "Поза проєктами": Color.orange])
             .frame(height: 180)
         }
     }
@@ -545,7 +545,7 @@ struct ProjectsView: View {
                     }
                 }
                 HStack {
-                    Button { selected = model.addProject(name: "Новый проект").id } label: { Image(systemName: "plus") }
+                    Button { selected = model.addProject(name: "Новий проєкт").id } label: { Image(systemName: "plus") }
                     Button {
                         if let id = selected { model.projects.removeAll { $0.id == id }; selected = nil }
                     } label: { Image(systemName: "minus") }
@@ -561,7 +561,7 @@ struct ProjectsView: View {
                 if let id = selected, let p = model.project(id) {
                     ProjectEditor(project: p).id(id)
                 } else {
-                    EmptyHint(title: "Выбери проект", text: "Или нажми «+», чтобы создать. Правила определяют, какое время попадёт в проект автоматически.", icon: "folder")
+                    EmptyHint(title: "Обери проєкт", text: "Або натисни «+», щоб створити. Правила визначають, який час потрапить у проєкт автоматично.", icon: "folder")
                 }
             }
             .frame(minWidth: 420, maxWidth: .infinity, maxHeight: .infinity)
@@ -589,20 +589,20 @@ struct ProjectEditor: View {
 
     var body: some View {
         Form {
-            TextField("Название", text: $name)
-            Toggle("В архиве (не ловит время)", isOn: $archived)
+            TextField("Назва", text: $name)
+            Toggle("В архіві (не ловить час)", isOn: $archived)
             Section {
                 ruleEditor($domains)
-            } header: { Text("Домены") } footer: { Text("По одному в строке: ti.ua — поймает и shop.ti.ua. Работает по адресу вкладки (Chrome, Safari, Arc, Brave, Edge) и по заголовку.").font(.caption) }
+            } header: { Text("Домени") } footer: { Text("По одному в рядку: ti.ua — спіймає і shop.ti.ua. Працює за адресою вкладки (Chrome, Safari, Arc, Brave, Edge) і за заголовком.").font(.caption) }
             Section {
                 ruleEditor($keywords)
-            } header: { Text("Фразы") } footer: { Text("Если фраза есть в заголовке окна или адресе — время идёт в проект. Например: техноїжак, название клиента, имя чата в Telegram (если в «Настройках» включено распознавание чата).").font(.caption) }
+            } header: { Text("Фрази") } footer: { Text("Якщо фраза є в заголовку вікна чи адресі — час іде в проєкт. Наприклад: техноїжак, назва клієнта, назва чату в Telegram (якщо в «Налаштуваннях» увімкнено розпізнавання чату).").font(.caption) }
             Section {
                 ruleEditor($apps)
-            } header: { Text("Приложения") } footer: { Text("Всё время в приложении целиком: Figma, Xcode. Можно имя или bundle id.").font(.caption) }
+            } header: { Text("Програми") } footer: { Text("Весь час у програмі цілком: Figma, Xcode. Можна назву або bundle id.").font(.caption) }
             HStack {
                 Spacer()
-                Button("Сохранить") { save() }.keyboardShortcut("s").buttonStyle(.borderedProminent)
+                Button("Зберегти") { save() }.keyboardShortcut("s").buttonStyle(.borderedProminent)
             }
         }
         .formStyle(.grouped)
@@ -636,39 +636,39 @@ struct SettingsView: View {
 
     var body: some View {
         Form {
-            Section("Учёт") {
-                Stepper("Простой после \(model.settings.idleMinutes) мин без действий", value: $model.settings.idleMinutes, in: 1...30)
-                Stepper("Округлять до \(model.settings.roundingMinutes) мин", value: $model.settings.roundingMinutes, in: 1...30)
-                Stepper("Пунктов в комментарии: \(model.settings.commentMaxItems)", value: $model.settings.commentMaxItems, in: 1...15)
+            Section("Облік") {
+                Stepper("Простій після \(model.settings.idleMinutes) хв без дій", value: $model.settings.idleMinutes, in: 1...30)
+                Stepper("Округлювати до \(model.settings.roundingMinutes) хв", value: $model.settings.roundingMinutes, in: 1...30)
+                Stepper("Пунктів у коментарі: \(model.settings.commentMaxItems)", value: $model.settings.commentMaxItems, in: 1...15)
             }
             Section("Система") {
-                Toggle("Запускать при входе в систему", isOn: Binding(get: { model.launchAtLogin }, set: { model.launchAtLogin = $0 }))
+                Toggle("Запускати під час входу в систему", isOn: Binding(get: { model.launchAtLogin }, set: { model.launchAtLogin = $0 }))
                 HStack {
-                    Label(model.axTrusted ? "Доступ к заголовкам окон есть" : "Нет доступа к заголовкам окон",
+                    Label(model.axTrusted ? "Доступ до заголовків вікон є" : "Немає доступу до заголовків вікон",
                           systemImage: model.axTrusted ? "checkmark.circle.fill" : "xmark.octagon.fill")
                         .foregroundStyle(model.axTrusted ? .green : .red)
                     Spacer()
-                    Button("Универсальный доступ…") { Sensors.openAccessibilitySettings() }
+                    Button("Доступність…") { Sensors.openAccessibilitySettings() }
                 }
                 HStack {
-                    Text("Адреса вкладок браузеров").foregroundStyle(.secondary)
+                    Text("Адреси вкладок браузерів").foregroundStyle(.secondary)
                     Spacer()
-                    Button("Автоматизация…") { Sensors.openAutomationSettings() }
+                    Button("Автоматизація…") { Sensors.openAutomationSettings() }
                 }
             }
             Section {
-                Toggle("Распознавать название чата в Telegram", isOn: Binding(get: { model.settings.telegramOCR }, set: { on in
+                Toggle("Розпізнавати назву чату в Telegram", isOn: Binding(get: { model.settings.telegramOCR }, set: { on in
                     model.settings.telegramOCR = on
                     if on && !TelegramReader.screenCaptureAllowed { TelegramReader.requestScreenCapture() }
                 }))
                 if model.settings.telegramOCR { TelegramOCRRow(status: model.telegramOCR) }
             } header: { Text("Telegram") } footer: {
-                Text("Telegram не показывает название чата другим программам. Без этой опции весь Telegram пишется без заголовка, и правила-фразы его чаты не различают. С опцией Time Checker, пока Telegram активен, снимает только полосу с названием чата и распознаёт текст на этом Mac. Снимки не сохраняются и никуда не отправляются. Нужно разрешение «Запись экрана»; после выдачи macOS попросит перезапустить Time Checker.")
+                Text("Telegram не показує назву чату іншим програмам. Без цієї опції весь Telegram записується без заголовка, і правила-фрази його чати не розрізняють. З опцією Time Checker, поки Telegram активний, знімає лише смугу з назвою чату й розпізнає текст на цьому Mac. Знімки не зберігаються і нікуди не надсилаються. Потрібен дозвіл «Запис екрана»; після надання macOS попросить перезапустити Time Checker.")
                     .font(.caption)
             }
-            Section("Данные") {
-                LabeledContent("Папка", value: model.store.dir.path)
-                Button("Открыть в Finder") { model.openDataFolder() }
+            Section("Дані") {
+                LabeledContent("Тека", value: model.store.dir.path)
+                Button("Відкрити у Finder") { model.openDataFolder() }
             }
         }
         .formStyle(.grouped)
@@ -681,14 +681,14 @@ struct TelegramOCRRow: View {
     var body: some View {
         HStack {
             if status.allowed {
-                Label(status.lastChat.map { "Работает, последний чат: \($0)" } ?? "Работает: откройте чат в Telegram",
+                Label(status.lastChat.map { "Працює, останній чат: \($0)" } ?? "Працює: відкрийте чат у Telegram",
                       systemImage: "checkmark.circle.fill")
                     .foregroundStyle(.green)
             } else {
-                Label("Нет разрешения «Запись экрана»", systemImage: "xmark.octagon.fill").foregroundStyle(.red)
+                Label("Немає дозволу «Запис екрана»", systemImage: "xmark.octagon.fill").foregroundStyle(.red)
             }
             Spacer()
-            Button("Запись экрана…") { TelegramReader.openScreenCaptureSettings() }
+            Button("Запис екрана…") { TelegramReader.openScreenCaptureSettings() }
         }
     }
 }
@@ -699,15 +699,15 @@ struct HelpView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
-                help("Как это работает",
-                     "Раз в секунду Time Checker смотрит, какое окно активно: приложение, заголовок окна и — для Chrome, Safari, Arc, Brave, Edge — адрес вкладки. Время режется на отрезки и по правилам раскладывается по проектам. Всё хранится локально, в сеть ничего не уходит.")
-                help("Правила", "Во вкладке «Проекты» у каждого проекта три типа правил:\n• Домены — ti.ua ловит ti.ua и все поддомены.\n• Фразы — ищутся в заголовке окна и адресе, без учёта регистра; одинаковые на вид кириллица и латиница («СЕО» и «CEO») считаются одним и тем же.\n• Приложения — всё время в приложении целиком.\nПорядок: ручное отнесение → домен → домен в заголовке → фраза → приложение.")
-                help("Другое", "Всё, что не попало ни в один проект, — во вкладке «Другое». Две группировки: по сессиям (хронология) и по программам. Выдели строки (⌘/Shift-клик) и отнеси к проекту. Правый клик → «Всегда относить сайт…» создаст правило на будущее.")
-                help("Простой и отлучки", "Если 3 минуты (настраивается) не трогать клавиатуру и мышь — время уходит в «Простой» задним числом с последнего действия. Блокировка экрана и сон — «Отлучки». И то и другое видно в «Другом», его можно отнести к проекту: например, читал документ или был на созвоне.")
-                help("Отчёт", "Время по проекту округляется до 5 минут (настраивается). Комментарий собирается из самых «долгих» заголовков окон; его можно поправить — правка сохраняется. «Копировать отчёт» (⇧⌘C) кладёт всё одним текстом в буфер.")
-                help("Telegram", "Telegram не показывает название открытого чата другим программам: в заголовке окна всегда «Telegram @ аккаунт». Поэтому по умолчанию время в Telegram пишется без заголовка — правила-фразы его чаты не различают, а слова из имени аккаунта больше не ловят весь Telegram. Такие отрезки разбирай во вкладке «Другое» или правилом «приложение».\nВ «Настройках» можно включить распознавание названия чата. Пока Telegram активен, Time Checker раз в пару секунд снимает только полосу шапки чата и распознаёт текст на этом Mac — заголовок становится «Telegram — название чата», и фразы снова работают. Снимки не сохраняются и никуда не отправляются. Нужно разрешение «Запись экрана».")
-                help("Разрешения", "• Универсальный доступ — чтобы читать заголовки окон. Без него видно только приложение.\n• Автоматизация — macOS спросит один раз для каждого браузера, чтобы читать адрес вкладки.\n• Запись экрана — только если включено распознавание чата в Telegram. macOS время от времени переспрашивает это разрешение.\nПосле пересборки приложения доступ иногда приходится выдать заново.")
-                help("Ограничения", "Считается только активное окно в фокусе. Firefox не отдаёт адрес вкладки — для него работают только заголовки. Сервисы, в заголовке которых нет проекта (Serpstat, планировщики и т. п.), уходят в «Другое» — разбирай вручную или добавь фразы. Telegram без распознавания чата — одна строка без заголовка; с распознаванием название иногда читается с ошибками (эмодзи пропадают), а заголовок обновляется через 1–3 секунды после смены чата.")
+                help("Як це працює",
+                     "Щосекунди Time Checker дивиться, яке вікно активне: програма, заголовок вікна і — для Chrome, Safari, Arc, Brave, Edge — адреса вкладки. Час ділиться на відрізки й за правилами розкладається по проєктах. Усе зберігається локально, у мережу нічого не йде.")
+                help("Правила", "На вкладці «Проєкти» кожен проєкт має три типи правил:\n• Домени — ti.ua ловить ti.ua і всі піддомени.\n• Фрази — шукаються в заголовку вікна й адресі, без урахування регістру; однакові на вигляд кирилиця й латиниця («СЕО» і «CEO») вважаються одним і тим самим.\n• Програми — весь час у програмі цілком.\nПорядок: ручне віднесення → домен → домен у заголовку → фраза → програма.")
+                help("Інше", "Усе, що не потрапило в жоден проєкт, — на вкладці «Інше». Два групування: за сесіями (хронологія) і за програмами. Виділи рядки (⌘/Shift-клік) і віднеси до проєкту. Правий клік → «Завжди відносити сайт…» створить правило на майбутнє.")
+                help("Простій і відлучки", "Якщо 3 хвилини (налаштовується) не торкатися клавіатури й миші — час іде в «Простій» заднім числом від останньої дії. Блокування екрана й сон — «Відлучки». І те, і те видно в «Іншому», його можна віднести до проєкту: наприклад, читав документ або був на дзвінку.")
+                help("Звіт", "Час по проєкту округлюється до 5 хвилин (налаштовується). Коментар збирається з найтриваліших заголовків вікон; його можна виправити — правка зберігається. «Копіювати звіт» (⇧⌘C) кладе все одним текстом у буфер.")
+                help("Telegram", "Telegram не показує назву відкритого чату іншим програмам: у заголовку вікна завжди «Telegram @ акаунт». Тому за замовчуванням час у Telegram записується без заголовка — правила-фрази його чати не розрізняють, а слова з імені акаунта більше не ловлять весь Telegram. Такі відрізки розбирай на вкладці «Інше» або правилом «програма».\nУ «Налаштуваннях» можна ввімкнути розпізнавання назви чату. Поки Telegram активний, Time Checker раз на кілька секунд знімає лише смугу шапки чату й розпізнає текст на цьому Mac — заголовок стає «Telegram — назва чату», і фрази знову працюють. Знімки не зберігаються і нікуди не надсилаються. Потрібен дозвіл «Запис екрана».")
+                help("Дозволи", "• Доступність — щоб читати заголовки вікон. Без неї видно лише програму.\n• Автоматизація — macOS запитає один раз для кожного браузера, щоб читати адресу вкладки.\n• Запис екрана — лише якщо ввімкнено розпізнавання чату в Telegram. macOS час від часу перепитує цей дозвіл.\nПісля перезбирання програми доступ іноді доводиться надати заново.")
+                help("Обмеження", "Враховується лише активне вікно у фокусі. Firefox не віддає адресу вкладки — для нього працюють лише заголовки. Сервіси, у заголовку яких немає проєкту (Serpstat, планувальники тощо), потрапляють в «Інше» — розбирай вручну або додай фрази. Telegram без розпізнавання чату — один рядок без заголовка; з розпізнаванням назва іноді читається з помилками (емодзі зникають), а заголовок оновлюється через 1–3 секунди після зміни чату.")
             }
             .padding(20)
             .frame(maxWidth: 680, alignment: .leading)

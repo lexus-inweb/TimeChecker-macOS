@@ -14,6 +14,6 @@
     <key>LSUIElement</key><true/>
     <key>NSHighResolutionCapable</key><true/>
     <key>NSAppleEventsUsageDescription</key>
-    <string>Time Checker читает адрес активной вкладки браузера, чтобы определить проект по домену. Данные не покидают ваш Mac.</string>
+    <string>Time Checker читає адресу активної вкладки браузера, щоб визначити проєкт за доменом. Дані не залишають ваш Mac.</string>
 </dict>
 </plist>

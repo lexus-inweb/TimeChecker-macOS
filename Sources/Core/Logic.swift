@@ -122,9 +122,9 @@ enum Report {
 
     static func format(minutes: Int) -> String {
         let h = minutes / 60, m = minutes % 60
-        if h == 0 { return "\(m) мин" }
-        if m == 0 { return "\(h) ч" }
-        return "\(h) ч \(m) мин"
+        if h == 0 { return "\(m) хв" }
+        if m == 0 { return "\(h) год" }
+        return "\(h) год \(m) хв"
     }
 
     static func format(seconds: TimeInterval) -> String {
@@ -250,8 +250,8 @@ enum Grouping {
 
     static func label(for s: Session) -> String {
         switch s.kind {
-        case .idle: return "Простой"
-        case .away: return "Отошёл / блокировка / сон"
+        case .idle: return "Простій"
+        case .away: return "Відлучився / блокування / сон"
         case .active: return s.domain ?? s.app
         }
     }
@@ -328,7 +328,7 @@ struct Stats: Equatable {
                 }
             }
             if s.kind == .active {
-                st.byApp[s.app.isEmpty ? "Неизвестно" : s.app, default: 0] += d
+                st.byApp[s.app.isEmpty ? "Невідомо" : s.app, default: 0] += d
                 if let dom = s.domain { st.byDomain[dom, default: 0] += d }
             }
         }

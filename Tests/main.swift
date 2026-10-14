@@ -118,9 +118,9 @@ check(Report.roundMinutes(61, step: 5) == 5, "round: минимум один ш�
 check(Report.roundMinutes(7 * 60 + 40, step: 5) == 10, "round: 7.7 → 10")
 check(Report.roundMinutes(7 * 60, step: 5) == 5, "round: 7 → 5")
 check(Report.roundMinutes(83 * 60, step: 1) == 83, "round: шаг 1")
-check(Report.format(minutes: 85) == "1 ч 25 мин", "format: ч+мин")
-check(Report.format(minutes: 120) == "2 ч", "format: ровно часы")
-check(Report.format(minutes: 5) == "5 мин", "format: минуты")
+check(Report.format(minutes: 85) == "1 год 25 хв", "format: ч+мин")
+check(Report.format(minutes: 120) == "2 год", "format: ровно часы")
+check(Report.format(minutes: 5) == "5 хв", "format: минуты")
 check(Report.cleanTitle("(3) Аудит сайта - Google Chrome", app: "Google Chrome") == "Аудит сайта", "clean: счётчик и браузер")
 check(Report.cleanTitle("Задача 12 — Планфикс - user@example.com - Google Chrome", app: "Google Chrome") == "Задача 12 — Планфикс", "clean: почта")
 check(Report.cleanTitle("Хроника / inweb - Google Chrome – Work (example.com)", app: "Google Chrome") == "Хроника / inweb", "clean: профиль Chrome")
@@ -141,7 +141,7 @@ check(lines.first?.projectId == ti.id && lines.first?.minutes == 40, "report: Т
 check(lines.first?.comment == "Аудит сайта; Техноїжак: план — Google Docs", "report: комментарий по весу, без коротких")
 check(lines.last?.minutes == 10, "report: Figma 9.5 мин → 10")
 let txt = Report.text(lines, comments: [figma.id: "Правки макета"])
-check(txt.contains("Техноїжак — 40 мин\nАудит сайта") && txt.hasSuffix("Дизайн — 10 мин\nПравки макета"), "report: текст и ручной комментарий")
+check(txt.contains("Техноїжак — 40 хв\nАудит сайта") && txt.hasSuffix("Дизайн — 10 хв\nПравки макета"), "report: текст и ручной комментарий")
 
 // MARK: Grouping & Stats
 let other = Grouping.unclassified(daySessions, projects: projects, includeIdle: true)
